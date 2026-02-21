@@ -59,6 +59,33 @@ function now(): number {
   return Date.now();
 }
 
+function syncRoundTimeout(room: GameRoom): void {
+  if (room.status !== "in_round") {
+    return;
+  }
+
+  const round = room.rounds[room.currentRoundIndex];
+  if (!round || round.status !== "active") {
+    return;
+  }
+
+  const startedAt = round.startedAt ?? now();
+  if (!round.startedAt) {
+    round.startedAt = startedAt;
+    room.updatedAt = now();
+    store.rooms.set(room.id, room);
+  }
+
+  if (now() - startedAt < ROUND_TIME_LIMIT_MS) {
+    return;
+  }
+
+  round.status = "finished";
+  round.endedAt = now();
+  advanceRound(room);
+  store.rooms.set(room.id, room);
+}
+
 function cloneRoom(room: GameRoom): GameRoom {
   return structuredClone(room);
 }
@@ -111,11 +138,17 @@ export function createRoom(input: {
 
 export function getRoom(roomId: string): GameRoom | undefined {
   const room = store.rooms.get(roomId);
+  if (room) {
+    syncRoundTimeout(room);
+  }
   return room ? cloneRoom(room) : undefined;
 }
 
 export function getPublicRoomById(roomId: string): PublicGameRoom | undefined {
   const room = store.rooms.get(roomId);
+  if (room) {
+    syncRoundTimeout(room);
+  }
   return room ? toPublicRoom(cloneRoom(room)) : undefined;
 }
 
@@ -197,6 +230,7 @@ export function applyEvaluationResult(input: {
   if (!room) {
     throw new Error("ROOM_NOT_FOUND");
   }
+  syncRoundTimeout(room);
   if (room.status !== "in_round") {
     return { matched: false, room: toPublicRoom(cloneRoom(room)) };
   }
@@ -234,6 +268,7 @@ export function applyEvaluationResult(input: {
 export function timeoutCurrentRound(roomId: string, roundIndex: number): PublicGameRoom {
   const room = store.rooms.get(roomId);
   if (!room) throw new Error("ROOM_NOT_FOUND");
+  syncRoundTimeout(room);
   if (room.status !== "in_round") return toPublicRoom(cloneRoom(room));
 
   const round = room.rounds[room.currentRoundIndex];
@@ -260,5 +295,6 @@ export function getCurrentRound(roomId: string): GameRound | undefined {
   if (!room) {
     return undefined;
   }
+  syncRoundTimeout(room);
   return structuredClone(room.rounds[room.currentRoundIndex]);
 }

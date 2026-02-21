@@ -4,17 +4,31 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 interface DrawingBoardProps {
   disabled?: boolean;
-  onSnapshot: (imageDataUrl: string) => Promise<void>;
+  onSnapshot: (imageDataUrl: string) => Promise<boolean>;
   canvasHeight?: string;
+  roundKey?: number;
+  clearSignal?: number;
+  successSignal?: number;
+  successLabel?: string;
 }
 
-export function DrawingBoard({ disabled = false, onSnapshot, canvasHeight = "min(56vh, 480px)" }: DrawingBoardProps) {
+export function DrawingBoard({
+  disabled = false,
+  onSnapshot,
+  canvasHeight = "min(56vh, 480px)",
+  roundKey,
+  clearSignal,
+  successSignal,
+  successLabel = "正解!"
+}: DrawingBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const pointerIdRef = useRef<number | null>(null);
   const pendingRef = useRef(false);
   const dirtyRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessBadge, setShowSuccessBadge] = useState(false);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const context = useMemo(() => {
     const canvas = canvasRef.current;
@@ -49,8 +63,21 @@ export function DrawingBoard({ disabled = false, onSnapshot, canvasHeight = "min
     setIsSubmitting(true);
 
     try {
-      await onSnapshot(canvas.toDataURL("image/png"));
-      dirtyRef.current = false;
+      const ok = await onSnapshot(canvas.toDataURL("image/png"));
+      if (ok) {
+        dirtyRef.current = false;
+      } else {
+        dirtyRef.current = true;
+        if (!disabled) {
+          if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+          }
+          retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null;
+            void sendSnapshot();
+          }, 180);
+        }
+      }
     } finally {
       pendingRef.current = false;
       setIsSubmitting(false);
@@ -62,7 +89,13 @@ export function DrawingBoard({ disabled = false, onSnapshot, canvasHeight = "min
       void sendSnapshot();
     }, 1400);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
   }, [disabled]);
 
   useEffect(() => {
@@ -131,7 +164,7 @@ export function DrawingBoard({ disabled = false, onSnapshot, canvasHeight = "min
     void sendSnapshot();
   }
 
-  function clearCanvas(): void {
+  function clearCanvas(markAsDirty = true): void {
     const canvas = canvasRef.current;
     if (!canvas || !context) {
       return;
@@ -140,42 +173,69 @@ export function DrawingBoard({ disabled = false, onSnapshot, canvasHeight = "min
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    dirtyRef.current = true;
+    dirtyRef.current = markAsDirty;
   }
 
+  useEffect(() => {
+    clearCanvas(false);
+  }, [roundKey]);
+
+  useEffect(() => {
+    if (!clearSignal) {
+      return;
+    }
+    clearCanvas(false);
+  }, [clearSignal]);
+
+  useEffect(() => {
+    if (!successSignal) {
+      return;
+    }
+    clearCanvas(false);
+    setShowSuccessBadge(true);
+    const timer = setTimeout(() => setShowSuccessBadge(false), 1000);
+    return () => clearTimeout(timer);
+  }, [successSignal]);
+
   return (
-    <section style={{ marginBottom: 0 }}>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <h3>キャンバス</h3>
-        <div className="row">
-          <button onClick={clearCanvas} disabled={disabled}>
+    <section className="draw-board">
+      <div className="draw-head">
+        <div>
+          <p className="panel-kicker">Canvas</p>
+          <h3>ドローイング</h3>
+        </div>
+        <div className="row draw-toolbar">
+          <button onClick={() => clearCanvas()} disabled={disabled}>
             クリア
           </button>
-          <button onClick={() => void sendSnapshot()} disabled={disabled || isSubmitting}>
+          <button className="primary" onClick={() => void sendSnapshot()} disabled={disabled || isSubmitting}>
             {isSubmitting ? "送信中..." : "今すぐ判定"}
           </button>
         </div>
       </div>
 
-      <canvas
-        ref={canvasRef}
-        width={880}
-        height={560}
-        style={{
-          width: "100%",
-          height: canvasHeight,
-          border: "1px solid #d8deea",
-          borderRadius: 12,
-          background: "#fff",
-          touchAction: "none",
-          marginTop: 10
-        }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endDrawing}
-        onPointerCancel={endDrawing}
-        onPointerLeave={endDrawing}
-      />
+      <div className="draw-canvas-wrap draw-canvas-stage">
+        <canvas
+          ref={canvasRef}
+          width={880}
+          height={560}
+          style={{
+            width: "100%",
+            height: canvasHeight,
+            touchAction: "none"
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={endDrawing}
+          onPointerCancel={endDrawing}
+          onPointerLeave={endDrawing}
+        />
+        {showSuccessBadge ? (
+          <div className="draw-success-overlay">
+            <div className="draw-success-pill">{successLabel}</div>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

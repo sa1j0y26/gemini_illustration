@@ -63,19 +63,19 @@ export function Lobby() {
   }
 
   return (
-    <div className="grid two">
-      <section>
+    <div className="lobby-grid">
+      <section className="lobby-card lobby-create">
+        <p className="panel-kicker">Host</p>
         <h2>部屋を作成</h2>
         <p className="muted">ホストとして部屋を作り、最大4人でゲームを開始します。</p>
-        <div style={{ height: 10 }} />
 
-        <label>
-          プレイヤー名
+        <label className="field">
+          <span>プレイヤー名</span>
           <input value={hostName} maxLength={24} onChange={(event) => setHostName(event.target.value)} />
         </label>
 
-        <label>
-          お題数
+        <label className="field">
+          <span>お題数</span>
           <input
             type="number"
             min={1}
@@ -85,18 +85,18 @@ export function Lobby() {
           />
         </label>
 
-        <button className="primary" onClick={handleCreateRoom} disabled={busy}>
+        <button className="primary wide" onClick={handleCreateRoom} disabled={busy}>
           {busy ? "作成中..." : "部屋を作る"}
         </button>
       </section>
 
-      <section>
+      <section className="lobby-card lobby-join">
+        <p className="panel-kicker">Guest</p>
         <h2>部屋に参加</h2>
         <p className="muted">招待された部屋IDを使って参加します。</p>
-        <div style={{ height: 10 }} />
 
-        <label>
-          部屋ID
+        <label className="field">
+          <span>部屋ID</span>
           <input
             value={joinRoomId}
             maxLength={16}
@@ -105,17 +105,17 @@ export function Lobby() {
           />
         </label>
 
-        <label>
-          プレイヤー名
+        <label className="field">
+          <span>プレイヤー名</span>
           <input value={joinName} maxLength={24} onChange={(event) => setJoinName(event.target.value)} />
         </label>
 
-        <button onClick={handleJoinRoom} disabled={busy}>
+        <button className="wide" onClick={handleJoinRoom} disabled={busy}>
           {busy ? "参加中..." : "参加する"}
         </button>
 
         {error ? (
-          <p style={{ marginTop: 12, color: "#9b1c1c" }}>
+          <p className="error-box">
             Error: <span className="code">{error}</span>
           </p>
         ) : null}
