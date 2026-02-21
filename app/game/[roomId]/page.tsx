@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { DrawingBoard } from "@/components/drawing-board";
 import type { DrawingEvaluation, PublicGameRoom } from "@/lib/game/types";
+import { ROUND_TIME_LIMIT_MS } from "@/lib/game/config";
 
 interface RoomResponse {
   room: PublicGameRoom;
@@ -27,6 +28,8 @@ export default function GamePage() {
   const [busy, setBusy] = useState(false);
   const [lastEvaluation, setLastEvaluation] = useState<DrawingEvaluation | null>(null);
   const [matchedText, setMatchedText] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const handledTimeoutForRoundRef = useRef<number>(-1);
 
   const fetchRoom = useCallback(async () => {
     const response = await fetch(`/api/rooms/${roomId}`, { cache: "no-store" });
@@ -124,6 +127,37 @@ export default function GamePage() {
     return [...room.players].sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt);
   }, [room]);
 
+  useEffect(() => {
+    if (!currentRound || currentRound.status !== "active" || !currentRound.startedAt) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const compute = () => Math.max(0, Math.ceil((ROUND_TIME_LIMIT_MS - (Date.now() - currentRound.startedAt!)) / 1000));
+    setTimeLeft(compute());
+
+    const timer = setInterval(() => setTimeLeft(compute()), 250);
+    return () => clearInterval(timer);
+  }, [currentRound?.index, currentRound?.status, currentRound?.startedAt]);
+
+  useEffect(() => {
+    if (timeLeft !== 0 || !currentRound || currentRound.status !== "active") return;
+    if (handledTimeoutForRoundRef.current === currentRound.index) return;
+    handledTimeoutForRoundRef.current = currentRound.index;
+
+    const idx = currentRound.index;
+    void fetch(`/api/rooms/${roomId}/timeout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roundIndex: idx })
+    }).then(async (res) => {
+      if (res.ok) {
+        const data = (await res.json()) as RoomResponse;
+        setRoom(data.room);
+      }
+    });
+  }, [timeLeft, currentRound, roomId]);
+
   return (
     <main>
       <section>
@@ -170,9 +204,20 @@ export default function GamePage() {
 
             {currentRound ? (
               <div style={{ marginTop: 10 }}>
-                <p>
-                  現在のお題: <strong>{currentRound.prompt}</strong>
-                </p>
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <p>
+                    現在のお題: <strong>{currentRound.prompt}</strong>
+                  </p>
+                  {timeLeft !== null ? (
+                    <p style={{
+                      fontWeight: "bold",
+                      fontSize: "1.2rem",
+                      color: timeLeft <= 10 ? "#9b1c1c" : timeLeft <= 20 ? "#92400e" : undefined
+                    }}>
+                      {timeLeft}s
+                    </p>
+                  ) : null}
+                </div>
                 <p className="muted">AIへの選択肢: {currentRound.choices.join(" / ")}</p>
               </div>
             ) : (
@@ -199,7 +244,7 @@ export default function GamePage() {
             </div>
           </section>
 
-          <DrawingBoard disabled={room.status !== "in_round"} onSnapshot={handleSnapshot} />
+          <DrawingBoard disabled={room.status !== "in_round" || timeLeft === 0} onSnapshot={handleSnapshot} />
 
           <section>
             <h3>最新の AI 判定</h3>

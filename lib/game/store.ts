@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { DEFAULT_PROMPTS, DEFAULT_ROUND_COUNT, MAX_PLAYERS } from "@/lib/game/config";
+import { DEFAULT_PROMPTS, DEFAULT_ROUND_COUNT, MAX_PLAYERS, ROUND_TIME_LIMIT_MS } from "@/lib/game/config";
 import type { DrawingEvaluation, GameRoom, GameRound, Player, PublicGameRoom } from "@/lib/game/types";
 
 type GameStore = {
@@ -232,6 +232,30 @@ export function applyEvaluationResult(input: {
   store.rooms.set(room.id, room);
 
   return { matched: true, room: toPublicRoom(cloneRoom(room)), correctPrompt: round.prompt };
+}
+
+export function timeoutCurrentRound(roomId: string, roundIndex: number): PublicGameRoom {
+  const room = store.rooms.get(roomId);
+  if (!room) throw new Error("ROOM_NOT_FOUND");
+  if (room.status !== "in_round") return toPublicRoom(cloneRoom(room));
+
+  const round = room.rounds[room.currentRoundIndex];
+  if (!round || round.status !== "active" || round.index !== roundIndex) {
+    return toPublicRoom(cloneRoom(room));
+  }
+
+  const elapsed = now() - (round.startedAt ?? 0);
+  if (elapsed < ROUND_TIME_LIMIT_MS) {
+    return toPublicRoom(cloneRoom(room));
+  }
+
+  round.status = "finished";
+  round.endedAt = now();
+
+  advanceRound(room);
+  store.rooms.set(room.id, room);
+
+  return toPublicRoom(cloneRoom(room));
 }
 
 export function getCurrentRound(roomId: string): GameRound | undefined {

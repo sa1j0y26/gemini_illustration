@@ -23,3 +23,4 @@ export const DEFAULT_PROMPTS = [
 
 export const DEFAULT_ROUND_COUNT = 10;
 export const MAX_PLAYERS = 4;
+export const ROUND_TIME_LIMIT_MS = 30_000;
