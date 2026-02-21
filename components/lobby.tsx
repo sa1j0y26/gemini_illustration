@@ -3,18 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-function normalizePromptInput(raw: string): string[] {
-  return raw
-    .split(/[\n,]/)
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-}
-
 export function Lobby() {
   const router = useRouter();
   const [hostName, setHostName] = useState("Player1");
   const [roundCount, setRoundCount] = useState(10);
-  const [promptInput, setPromptInput] = useState("");
   const [joinName, setJoinName] = useState("Player2");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,15 +16,12 @@ export function Lobby() {
     setBusy(true);
     setError(null);
 
-    const prompts = normalizePromptInput(promptInput);
-
     const response = await fetch("/api/rooms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         hostName,
-        targetRoundCount: roundCount,
-        promptPool: prompts.length > 0 ? prompts : undefined
+        targetRoundCount: roundCount
       })
     });
 
@@ -93,16 +82,6 @@ export function Lobby() {
             max={30}
             value={roundCount}
             onChange={(event) => setRoundCount(Number(event.target.value))}
-          />
-        </label>
-
-        <label>
-          お題候補（任意: 改行/カンマ区切り）
-          <textarea
-            rows={5}
-            placeholder="りんご\nねこ\nいぬ\n..."
-            value={promptInput}
-            onChange={(event) => setPromptInput(event.target.value)}
           />
         </label>
 

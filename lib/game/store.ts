@@ -29,30 +29,30 @@ function normalizePrompt(prompt: string): string {
   return prompt.trim().toLowerCase();
 }
 
-function buildRoundChoices(prompt: string, promptPool: string[], count = 4): string[] {
-  const others = shuffle(promptPool.filter((item) => normalizePrompt(item) !== normalizePrompt(prompt))).slice(
-    0,
-    Math.max(0, count - 1)
-  );
-  return shuffle([prompt, ...others]);
+function selectRoundPrompts(promptPool: string[], targetRoundCount: number): string[] {
+  const shuffled = shuffle(promptPool);
+  if (shuffled.length >= targetRoundCount) {
+    return shuffled.slice(0, targetRoundCount);
+  }
+
+  // promptPool が少ない場合は循環で補う
+  const selected: string[] = [];
+  while (selected.length < targetRoundCount) {
+    selected.push(shuffled[selected.length % shuffled.length]);
+  }
+  return selected;
 }
 
 function buildRounds(promptPool: string[], targetRoundCount: number): GameRound[] {
   const base = promptPool.length > 0 ? [...promptPool] : [...DEFAULT_PROMPTS];
-  const rounds: GameRound[] = [];
-  const looped = [...shuffle(base)];
-
-  while (rounds.length < targetRoundCount) {
-    const nextPrompt = looped[rounds.length % looped.length];
-    rounds.push({
-      index: rounds.length,
-      prompt: nextPrompt,
-      choices: buildRoundChoices(nextPrompt, base),
-      status: "pending"
-    });
-  }
-
-  return rounds;
+  const selectedPrompts = selectRoundPrompts(base, targetRoundCount);
+  return selectedPrompts.map((prompt, index) => ({
+    index,
+    prompt,
+    // AI にはお題プール全件を渡す
+    choices: shuffle(base),
+    status: "pending"
+  }));
 }
 
 function now(): number {
@@ -81,7 +81,6 @@ export function toPublicRoom(room: GameRoom): PublicGameRoom {
 export function createRoom(input: {
   hostName: string;
   targetRoundCount?: number;
-  promptPool?: string[];
 }): { room: PublicGameRoom; player: Player } {
   const hostPlayer: Player = {
     id: nanoid(10),
@@ -90,9 +89,7 @@ export function createRoom(input: {
     joinedAt: now()
   };
 
-  const cleanedPromptPool = (input.promptPool ?? DEFAULT_PROMPTS)
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+  const promptPool = [...DEFAULT_PROMPTS];
 
   const room: GameRoom = {
     id: nanoid(8),
@@ -101,9 +98,9 @@ export function createRoom(input: {
     maxPlayers: MAX_PLAYERS,
     targetRoundCount: input.targetRoundCount ?? DEFAULT_ROUND_COUNT,
     currentRoundIndex: 0,
-    promptPool: cleanedPromptPool,
+    promptPool,
     players: [hostPlayer],
-    rounds: buildRounds(cleanedPromptPool, input.targetRoundCount ?? DEFAULT_ROUND_COUNT),
+    rounds: buildRounds(promptPool, input.targetRoundCount ?? DEFAULT_ROUND_COUNT),
     createdAt: now(),
     updatedAt: now()
   };

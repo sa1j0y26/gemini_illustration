@@ -30,6 +30,7 @@ export default function GamePage() {
   const [matchedText, setMatchedText] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const handledTimeoutForRoundRef = useRef<number>(-1);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
 
   const fetchRoom = useCallback(async () => {
     const response = await fetch(`/api/rooms/${roomId}`, { cache: "no-store" });
@@ -66,6 +67,17 @@ export default function GamePage() {
 
     setBusy(true);
     setError(null);
+    setAiStatus("AI接続を確認中...");
+
+    const validateResponse = await fetch("/api/ai/validate", { method: "POST" });
+    const validateData = await validateResponse.json();
+    if (!validateResponse.ok || !validateData?.ok) {
+      setBusy(false);
+      setAiStatus(null);
+      setError(validateData?.error ?? "AI_KEY_OR_MODEL_INVALID");
+      return;
+    }
+    setAiStatus(`AI接続OK (${validateData.provider}${validateData.detail ? `: ${validateData.detail}` : ""})`);
 
     const response = await fetch(`/api/rooms/${roomId}/start`, {
       method: "POST",
@@ -77,6 +89,7 @@ export default function GamePage() {
     setBusy(false);
 
     if (!response.ok) {
+      setAiStatus(null);
       setError(data?.error ?? "START_FAILED");
       return;
     }
@@ -201,6 +214,7 @@ export default function GamePage() {
                 ) : null}
               </div>
             </div>
+            {aiStatus ? <p className="muted" style={{ marginTop: 6 }}>{aiStatus}</p> : null}
 
             {currentRound ? (
               <div style={{ marginTop: 10 }}>
@@ -218,7 +232,6 @@ export default function GamePage() {
                     </p>
                   ) : null}
                 </div>
-                <p className="muted">AIへの選択肢: {currentRound.choices.join(" / ")}</p>
               </div>
             ) : (
               <p>ラウンド情報なし</p>

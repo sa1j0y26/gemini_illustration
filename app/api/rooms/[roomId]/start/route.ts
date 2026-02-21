@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateAiEvaluatorBeforeGameStart } from "@/lib/ai/evaluator";
 import { startGame } from "@/lib/game/store";
 
 const startSchema = z.object({
@@ -19,6 +20,7 @@ export async function POST(req: Request, context: Params): Promise<Response> {
     }
 
     const { roomId } = await context.params;
+    await validateAiEvaluatorBeforeGameStart();
     const room = startGame(roomId, parsed.data.requestedByPlayerId);
     return Response.json({ room });
   } catch (error) {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { evaluateDrawing } from "@/lib/ai/evaluator";
-import { applyEvaluationResult, getCurrentRound } from "@/lib/game/store";
+import { applyEvaluationResult, getCurrentRound, getRoom } from "@/lib/game/store";
 
 const snapshotSchema = z.object({
   playerId: z.string().min(1),
@@ -21,14 +21,15 @@ export async function POST(req: Request, context: Params): Promise<Response> {
       return Response.json({ error: "INVALID_BODY", detail: parsed.error.flatten() }, { status: 400 });
     }
 
+    const room = getRoom(roomId);
     const round = getCurrentRound(roomId);
-    if (!round) {
+    if (!room || !round) {
       return Response.json({ error: "ROOM_OR_ROUND_NOT_FOUND" }, { status: 404 });
     }
 
     const evaluation = await evaluateDrawing({
       imageDataUrl: parsed.data.imageDataUrl,
-      choices: round.choices
+      choices: room.promptPool
     });
 
     const result = applyEvaluationResult({
