@@ -172,105 +172,105 @@ export default function GamePage() {
   }, [timeLeft, currentRound, roomId]);
 
   return (
-    <main>
-      <section>
-        <h1>Game Room</h1>
-        <p>
-          Room ID: <span className="code">{roomId}</span>
-        </p>
-        <p>
-          Player ID: <span className="code">{playerId || "(missing)"}</span>
-        </p>
-      </section>
+    <main className="game-screen">
+      <section className="game-top">
+        <div className="game-top-row">
+          <div>
+            <h1>Game Room</h1>
+            <p className="muted">
+              Room ID: <span className="code">{roomId}</span> | Player ID: <span className="code">{playerId || "(missing)"}</span>
+            </p>
+            {room ? (
+              <p className="muted">
+                status: <span className="code">{room.status}</span> | round {Math.min(room.currentRoundIndex + 1, room.rounds.length)}/
+                {room.rounds.length}
+              </p>
+            ) : null}
+          </div>
 
-      {error ? (
-        <section>
-          <p style={{ color: "#9b1c1c" }}>
+          <div className="row">
+            {room?.status === "lobby" && room.hostPlayerId === playerId ? (
+              <button className="primary" onClick={() => void handleStart()} disabled={busy}>
+                {busy ? "開始中..." : "ゲーム開始"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {aiStatus ? <p className="muted" style={{ marginTop: 6 }}>{aiStatus}</p> : null}
+        {error ? (
+          <p style={{ marginTop: 6, color: "#9b1c1c" }}>
             Error: <span className="code">{error}</span>
           </p>
-        </section>
-      ) : null}
+        ) : null}
+
+        {room && currentRound ? (
+          <div className="game-round-row">
+            <p>
+              現在のお題: <strong>{currentRound.prompt}</strong>
+            </p>
+            {timeLeft !== null ? (
+              <p
+                style={{
+                  fontWeight: "bold",
+                  fontSize: "1.2rem",
+                  color: timeLeft <= 10 ? "#9b1c1c" : timeLeft <= 20 ? "#92400e" : undefined
+                }}
+              >
+                {timeLeft}s
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {matchedText ? <p className="good" style={{ marginTop: 6 }}>{matchedText}</p> : null}
+      </section>
 
       {!room ? (
-        <section>
+        <section className="game-loading">
           <p>読み込み中...</p>
         </section>
       ) : (
-        <>
-          <section>
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>
-                <h2>ゲーム状態</h2>
-                <p className="muted">
-                  status: <span className="code">{room.status}</span> | round {Math.min(room.currentRoundIndex + 1, room.rounds.length)}/
-                  {room.rounds.length}
-                </p>
-              </div>
-              <div className="row">
-                {room.status === "lobby" && room.hostPlayerId === playerId ? (
-                  <button className="primary" onClick={() => void handleStart()} disabled={busy}>
-                    {busy ? "開始中..." : "ゲーム開始"}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-            {aiStatus ? <p className="muted" style={{ marginTop: 6 }}>{aiStatus}</p> : null}
+        <div className="game-content">
+          <div className="game-canvas-pane">
+            <DrawingBoard
+              disabled={room.status !== "in_round" || timeLeft === 0}
+              onSnapshot={handleSnapshot}
+              canvasHeight="min(58vh, 500px)"
+            />
+          </div>
 
-            {currentRound ? (
-              <div style={{ marginTop: 10 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <p>
-                    現在のお題: <strong>{currentRound.prompt}</strong>
-                  </p>
-                  {timeLeft !== null ? (
-                    <p style={{
-                      fontWeight: "bold",
-                      fontSize: "1.2rem",
-                      color: timeLeft <= 10 ? "#9b1c1c" : timeLeft <= 20 ? "#92400e" : undefined
-                    }}>
-                      {timeLeft}s
+          <div className="game-side-pane">
+            <section className="game-card">
+              <h2>スコアボード</h2>
+              <div className="game-score-list">
+                {sortedPlayers.map((player, index) => (
+                  <div key={player.id} className="row" style={{ justifyContent: "space-between" }}>
+                    <p>
+                      {index + 1}. {player.name}
+                      {player.id === room.hostPlayerId ? " (host)" : ""}
                     </p>
-                  ) : null}
-                </div>
+                    <p>
+                      <strong>{player.score}</strong> pt
+                    </p>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <p>ラウンド情報なし</p>
-            )}
+            </section>
 
-            {matchedText ? <p className="good" style={{ marginTop: 8 }}>{matchedText}</p> : null}
-          </section>
-
-          <section>
-            <h2>スコアボード</h2>
-            <div className="grid" style={{ marginTop: 8 }}>
-              {sortedPlayers.map((player, index) => (
-                <div key={player.id} className="row" style={{ justifyContent: "space-between" }}>
-                  <p>
-                    {index + 1}. {player.name}
-                    {player.id === room.hostPlayerId ? " (host)" : ""}
-                  </p>
-                  <p>
-                    <strong>{player.score}</strong> pt
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <DrawingBoard disabled={room.status !== "in_round" || timeLeft === 0} onSnapshot={handleSnapshot} />
-
-          <section>
-            <h3>最新の AI 判定</h3>
-            {!lastEvaluation ? (
-              <p className="muted">まだ判定がありません。</p>
-            ) : (
-              <p>
-                推定: <strong>{lastEvaluation.guess}</strong> / 信頼度: {lastEvaluation.confidence} / provider: {" "}
-                <span className="code">{lastEvaluation.provider}</span>
-              </p>
-            )}
-          </section>
-        </>
+            <section className="game-card">
+              <h3>最新の AI 判定</h3>
+              {!lastEvaluation ? (
+                <p className="muted">まだ判定がありません。</p>
+              ) : (
+                <p>
+                  推定: <strong>{lastEvaluation.guess}</strong> / 信頼度: {lastEvaluation.confidence} / provider:{" "}
+                  <span className="code">{lastEvaluation.provider}</span>
+                </p>
+              )}
+            </section>
+          </div>
+        </div>
       )}
     </main>
   );

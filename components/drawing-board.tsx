@@ -5,9 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 interface DrawingBoardProps {
   disabled?: boolean;
   onSnapshot: (imageDataUrl: string) => Promise<void>;
+  canvasHeight?: string;
 }
 
-export function DrawingBoard({ disabled = false, onSnapshot }: DrawingBoardProps) {
+export function DrawingBoard({ disabled = false, onSnapshot, canvasHeight = "min(56vh, 480px)" }: DrawingBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const pointerIdRef = useRef<number | null>(null);
@@ -143,7 +144,7 @@ export function DrawingBoard({ disabled = false, onSnapshot }: DrawingBoardProps
   }
 
   return (
-    <section>
+    <section style={{ marginBottom: 0 }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h3>キャンバス</h3>
         <div className="row">
@@ -162,6 +163,7 @@ export function DrawingBoard({ disabled = false, onSnapshot }: DrawingBoardProps
         height={560}
         style={{
           width: "100%",
+          height: canvasHeight,
           border: "1px solid #d8deea",
           borderRadius: 12,
           background: "#fff",
